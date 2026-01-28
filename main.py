@@ -1,69 +1,81 @@
-from fastapi import FastAPI, Depends
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI , HTTPException, Depends
+from pydantic import BaseModel , Field
+from uuid import UUID
+import models
+from databaase import engine, SessionLocal,
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
 
-from database import SessionLocal
-from models import Student
+
 
 app = FastAPI()
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+models.Base.metadata.create_all(bind=engine)
 
-# Pydantic schema for input
-class StudentCreate(BaseModel):
-    name: str
-    email: str
-    age: int
 
-# Database dependency
 def get_db():
-    db = SessionLocal()
     try:
-        yield db
+        db = SessionLocal()
+        yield db 
     finally:
         db.close()
 
-# CREATE student
-@app.post("/students")
-def create_student(student: StudentCreate, db: Session = Depends(get_db)):
-    db_student = Student(name=student.name, email=student.email, age=student.age)
-    db.add(db_student)
-    db.commit()
-    db.refresh(db_student)
-    return db_student
 
-# READ all students
-@app.get("/students")
-def get_students(db: Session = Depends(get_db)):
-    return db.query(Student).all()
 
-# UPDATE student
-@app.put("/students/{student_id}")
-def update_student(student_id: int, student: StudentCreate, db: Session = Depends(get_db)):
-    db_student = db.query(Student).filter(Student.id == student_id).first()
-    if not db_student:
-        return {"error": "Student not found"}
-    db_student.name = student.name
-    db_student.email = student.email
-    db_student.age = student.age
-    db.commit()
-    db.refresh(db_student)
-    return db_student
 
-# DELETE student
-@app.delete("/students/{student_id}")
-def delete_student(student_id: int, db: Session = Depends(get_db)):
-    db_student = db.query(Student).filter(Student.id == student_id).first()
-    if not db_student:
-        return {"error": "Student not found"}
-    db.delete(db_student)
-    db.commit()
-    return {"message": "Student deleted successfully"}
+class Book(BaseModel):
+    
+    title : str = Field(min_length=1)
+    author : str = Field(min_length=1, max_length=100)
+    description : str = Field(min_length=1, max_length=100)
+    rating : int = Field(gt=-1,lt=101)
+
+BOOKS = []   
+
+@app.get('/')
+
+def read_api(db: Session = Depends(get_db)):
+    return db.query(models.Books).all()
+
+
+@app.post('/')
+def create_book(book :Book, db: Session= Depends(get_db)):
+    
+    book_model = models.Books()
+    book_model.title = book.title
+    book_model.author = book.author
+    book_model.description = book.description
+    book_model.rating = book.rating
+
+    db.add(book_model)
+    db.commit
+
+    return book
+
+
+@app.put("/{book_id}")
+def update_book(book_id: UUID, book : Book):
+    counter = 0
+    for x in BOOKS:
+        counter += 1
+        if x.id == book_id :
+            BOOKS[counter-1] = book
+            return BOOKS[counter-1]
+    raise HTTPException(
+        status_code=404,
+        detail=f"ID {book_id} : Does not exists"
+    )
+
+
+
+@app.delete("/{book_id}")
+def delete_book (book_id: UUID):
+    counter = 0
+    for x in BOOKS:
+        counter += 1
+        if x.id == book_id :
+            del BOOKS[counter-1]
+            return f"ID : {book_id}  deleted "
+    raise HTTPException(
+        status_code=404,
+        detail=f"ID {book_id} : Does not exists"
+    )

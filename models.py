@@ -1,10 +1,18 @@
 from sqlalchemy import Column, Integer, String
 from database import Base
 
-class Student(Base):
-    __tablename__ = "students"
+class Books(Base):
+    __tablename__ = "books"
 
-    id = Column(Integer, primary_key=True, index=True)  
-    name = Column(String, nullable=False)
-    email = Column(String, nullable=False, unique=True)
-    age = Column(Integer, nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    author = Column(String)
+    description = Column(String)
+    rating = Column(Integer)
+
+class Users(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True)
+    hashed_password = Column(String)

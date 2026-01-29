@@ -1,81 +1,47 @@
-from fastapi import FastAPI , HTTPException, Depends
-from pydantic import BaseModel , Field
-from uuid import UUID
-import models
-from databaase import engine, SessionLocal,
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-
-
+import models, schemas
+from database import engine, SessionLocal
+from auth import authenticate_user, get_current_user
+from fastapi.security import OAuth2PasswordRequestForm
 
 app = FastAPI()
 
 models.Base.metadata.create_all(bind=engine)
 
-
+# DB Dependency
 def get_db():
+    db = SessionLocal()
     try:
-        db = SessionLocal()
-        yield db 
+        yield db
     finally:
         db.close()
 
+# 🔐 TOKEN ENDPOINT (OAuth2)
+@app.post("/token")
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"access_token": user["username"], "token_type": "bearer"}
 
-
-
-class Book(BaseModel):
-    
-    title : str = Field(min_length=1)
-    author : str = Field(min_length=1, max_length=100)
-    description : str = Field(min_length=1, max_length=100)
-    rating : int = Field(gt=-1,lt=101)
-
-BOOKS = []   
-
-@app.get('/')
-
-def read_api(db: Session = Depends(get_db)):
+# 📘 READ BOOKS (Protected)
+@app.get("/")
+def read_books(
+    db: Session = Depends(get_db),
+    user: str = Depends(get_current_user)
+):
     return db.query(models.Books).all()
 
-
-@app.post('/')
-def create_book(book :Book, db: Session= Depends(get_db)):
-    
-    book_model = models.Books()
-    book_model.title = book.title
-    book_model.author = book.author
-    book_model.description = book.description
-    book_model.rating = book.rating
-
+# ➕ CREATE BOOK (Protected)
+@app.post("/")
+def create_book(
+    book: schemas.Book,
+    db: Session = Depends(get_db),
+    user: str = Depends(get_current_user)
+):
+    book_model = models.Books(**book.dict())
     db.add(book_model)
-    db.commit
-
-    return book
-
-
-@app.put("/{book_id}")
-def update_book(book_id: UUID, book : Book):
-    counter = 0
-    for x in BOOKS:
-        counter += 1
-        if x.id == book_id :
-            BOOKS[counter-1] = book
-            return BOOKS[counter-1]
-    raise HTTPException(
-        status_code=404,
-        detail=f"ID {book_id} : Does not exists"
-    )
-
-
-
-@app.delete("/{book_id}")
-def delete_book (book_id: UUID):
-    counter = 0
-    for x in BOOKS:
-        counter += 1
-        if x.id == book_id :
-            del BOOKS[counter-1]
-            return f"ID : {book_id}  deleted "
-    raise HTTPException(
-        status_code=404,
-        detail=f"ID {book_id} : Does not exists"
-    )
+    db.commit()
+    db.refresh(book_model)
+    return book_model

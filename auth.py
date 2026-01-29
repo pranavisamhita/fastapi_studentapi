@@ -8,7 +8,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 fake_users_db = {
     "admin": {
-        "username": "admin",
+        "username": "admim1",
         "password": "admin123"
     }
 }
